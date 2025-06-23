@@ -27,28 +27,49 @@ def search():
         # Búsqueda correcta, analizamos los resultados
         elements = web_scrapping_filmaffinity_search_page(res.text)
 
-    if not elements:
-        msg = {"error": "Sin resultados"}
-        return jsonify(msg), STATUS_CODE_NOT_FOUND
+    if elements:
+        response = []
+        for element in elements:
+            try:
+                filmCode = url_to_film_code(element[1])
+            except:
+                continue
 
-    for element in elements:
-        try:
-            filmCode = url_to_film_code(element[1])
-        except:
-            continue
+            responseItem = {
+                "id": filmCode,
+                "api": f'/api/film?id={filmCode}',
+                "title": element[0],
+                "url": element[1],
+                "rating": element[2],
+                "year": element[3],
+                "image": element[4]
+            }
+            response.append(responseItem)
 
-        responseItem = {
-            "id": filmCode,
-            "api": f'/api/film?id={filmCode}',
-            "title": element[0],
-            "url": element[1],
-            "rating": element[2],
-            "year": element[3],
-            "image": element[4]
-        }
-        response.append(responseItem)
+        return jsonify(response), STATUS_CODE_OK
 
-    return jsonify(response), STATUS_CODE_OK
+    else:
+        # Sin lista: puede que sea página ficha única
+        details = web_scrapping_filmaffinity_main_page(res.text)
+        if details[0]:  # título existe
+            try:
+                filmCode = url_to_film_code(details[1])
+            except:
+                filmCode = None
+
+            responseItem = {
+                "id": filmCode,
+                "api": f'/api/film?id={filmCode}' if filmCode else None,
+                "title": details[0],
+                "url": details[1],
+                "rating": details[2],
+                "year": details[3],
+                "image": details[4]
+            }
+            return jsonify([responseItem]), STATUS_CODE_OK  # siempre un array
+
+        else:
+            return jsonify({"error": "Sin resultados"}), STATUS_CODE_NOT_FOUND
 
 @app.route('/api/film', methods=['GET'])
 def filmById():
@@ -112,18 +133,14 @@ def web_scrapping_filmaffinity_search_page(htmlText):
         # 📌 Imagen
         image = ""
         poster_div = card.find('div', class_='mc-poster')
-        print(poster_div)
         if poster_div:
             img_tag = poster_div.find('img')
-            print(img_tag)
             if img_tag:
                 srcset = img_tag.get('data-srcset', '').strip()
-                print(srcset)
                 if srcset:
                     # Separar las distintas opciones en srcset
                     srcset_options = srcset.split(", ")
                     for option in srcset_options:
-                        print(option)
                         # Verificar si la opción contiene una URL
                         url = option.split(" ")[0]
                         if 'large' in url:
@@ -156,7 +173,12 @@ def web_scrapping_filmaffinity_search_page(htmlText):
             rating = rating_div.get_text(strip=True)
 
         # 📌 Agregamos la película a la lista
-        filmaffinityElements.append((title, url, rating, year, image))
+        try:
+            url_to_film_code(url)
+            filmaffinityElements.append((title, url, rating, year, image))
+        except:
+            # Si no se puede extraer el código de la película, ignoramos este elemento
+            continue
 
     return filmaffinityElements
 
