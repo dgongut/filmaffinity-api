@@ -1,3 +1,6 @@
+> [!CAUTION]
+> Este proyecto se encuentra descontinuado
+
 # filmaffinity-api
 
 API REST no oficial de Filmaffinity en castellano. Desarrollada desde cero en python.
